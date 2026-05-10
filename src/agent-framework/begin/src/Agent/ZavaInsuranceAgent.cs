@@ -26,6 +26,27 @@ namespace ZavaInsurance.Agent
     /// - Centralizes access to field photos, invoices, and inspection notes
     /// - Provides real-time visibility into bottlenecks and fraud indicators
     /// </summary>
+    /// <remarks>
+    /// Questa classe deriva da <see cref="AgentApplication"/> (M365 Agents SDK) e registra
+    /// tre handler usando tre meccanismi distinti offerti dal framework:
+    ///
+    /// 1. <b>OnConversationUpdate</b> (nel costruttore) — registra <c>WelcomeMessageAsync</c>
+    ///    come handler per l'evento MembersAdded. Il framework lo chiama automaticamente
+    ///    quando un utente entra nella conversazione.
+    ///
+    /// 2. <b>OnActivity</b> (nel costruttore) — registra <c>OnMessageAsync</c> come catch-all
+    ///    per qualsiasi messaggio di testo. DEVE essere registrato per ultimo perché
+    ///    AgentApplication valuta le route nell'ordine di registrazione e si ferma al
+    ///    primo match.
+    ///
+    /// 3. <b>[Route] attribute</b> (su <c>Reset</c>) — il costruttore di AgentApplication
+    ///    chiama ApplyRouteAttributes() che scansiona via reflection i metodi decorati
+    ///    con [Route] e li registra automaticamente, senza codice esplicito nel costruttore.
+    ///
+    /// I metodi <c>GetClientAgent</c> e <c>GetConversationThread</c> sono helper privati
+    /// chiamati esplicitamente da <c>OnMessageAsync</c>, non handler del framework.
+    /// Il metodo <c>GetUserProfile</c> è scaffolding preparato per passi successivi.
+    /// </remarks>
     public class ZavaInsuranceAgent : AgentApplication
     {
         private readonly string AgentInstructions = """
@@ -53,9 +74,20 @@ namespace ZavaInsurance.Agent
             _httpClient = httpClientFactory.CreateClient() ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
             // Greet when members are added to the conversation
+            // Registra WelcomeMessageAsync come handler per l'evento MembersAdded
+            // Quindi è AgentApplication (la base class) che, quando riceve una activity in ingresso dal canale, 
+            // scorre internamente la lista di route registrate e chiama automaticamente il tuo handler WelcomeMessageAsync. 
+            // Tu non invochi mai WelcomeMessageAsync direttamente — ci pensa il framework.
             OnConversationUpdate(ConversationUpdateEvents.MembersAdded, WelcomeMessageAsync);
 
             // Listen for ANY message to be received. MUST BE AFTER ANY OTHER MESSAGE HANDLERS
+            // Stesso meccanismo di registrazione, ma per un tipo di activity diverso (Message) e un handler diverso (OnMessageAsync).
+            // Registra OnMessageAsync come handler per qualsiasi activity di tipo message — cioè ogni volta che l'utente invia un testo nella chat.
+
+            // C'è però un dettaglio importante che il commento sottolinea: "MUST BE AFTER ANY OTHER MESSAGE HANDLERS".
+            // Questo perché AgentApplication valuta le route nell'ordine in cui sono state registrate e si ferma alla prima che fa match.
+            // Registrandolo per ultimo, si comporta come un catch-all — gestisce tutti i messaggi che non sono stati 
+            // già intercettati da handler più specifici (come ad esempio un handler per un comando specifico o per un pattern di testo).
             OnActivity(ActivityTypes.Message, OnMessageAsync);
         }
 

@@ -77,10 +77,17 @@ builder.AddAgentApplicationOptions();
 var agentType = builder.Configuration.GetValue<string>("AgentType", "ZavaInsurance");
 
 // Add the bot (which is transient)
+// Sotto il cofano viene eseguita una registrazione equivalente a questa:
+// `builder.Services.AddTransient<IAgent, ZavaInsuranceAgent>();` che dice al container DI:
+// "quando qualcuno chiede un IAgent, crea e restituisci un'istanza di ZavaInsuranceAgent".
+// Cioè stiamo dicendo al framework che IAgent deve essere soddisfatto da ZavaInsuranceAgent, 
+// e che ogni volta che viene richiesto, deve essere creato un nuovo oggetto (transient).
 builder.AddAgent<ZavaInsuranceAgent>();
 Console.WriteLine("🏢 Starting Zava Insurance Agent...");
 
-// Register IChatClient for the agent - basic setup without LanguageModelService
+// Register IChatClient for the agent - basic setup without LanguageModelService.
+// sp è l'IServiceProvider ovvero il "contenitore DI" stesso.
+// La lambda lo riceve come parametro, e lo usa per risolvere altre dipendenze già registrate.
 builder.Services.AddSingleton<IChatClient>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
